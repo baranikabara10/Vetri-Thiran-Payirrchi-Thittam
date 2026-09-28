@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        EduGenie - AI Learning Assistant
+    </title>
+
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', path='style.css') }}"
+    >
+
+</head>
+
+
+<body>
+
+
+<main class="container">
+
+
+    <!-- HERO -->
+
+    <section class="hero">
+
+        <div class="badge">
+            AI LEARNING ASSISTANT
+        </div>
+
+
+        <h1>
+            EduGenie
+        </h1>
+
+
+        <p>
+            Learn smarter with AI.
+            Ask questions, understand concepts,
+            generate quizzes, summarize notes,
+            and create personalized learning paths.
+        </p>
+
+    </section>
+
+
+
+    <!-- INPUT CARD -->
+
+    <section class="card">
+
+
+        <label for="task">
+            Choose a task
+        </label>
+
+
+        <select id="task">
+
+            <option value="qa">
+                Ask a Question
+            </option>
+
+            <option value="explain">
+                Explain a Topic
+            </option>
+
+            <option value="quiz">
+                Generate Quiz
+            </option>
+
+            <option value="summarize">
+                Summarize Text
+            </option>
+
+            <option value="learn">
+                Learning Path
+            </option>
+
+        </select>
+
+
+
+        <label for="inputText">
+            Your input
+        </label>
+
+
+        <textarea
+            id="inputText"
+            placeholder="Type your question, topic, or study material here..."
+        ></textarea>
+
+
+        <button
+            id="submitBtn"
+            onclick="runTask()"
+        >
+            Generate
+        </button>
+
+
+        <p
+            id="status"
+            class="status"
+        ></p>
+
+
+    </section>
+
+
+
+    <!-- RESULT -->
+
+    <section
+        id="resultCard"
+        class="card result-card hidden"
+    >
+
+
+        <div class="result-header">
+
+            <h2>
+                Result
+            </h2>
+
+
+            <button
+                class="copy-btn"
+                onclick="copyResult()"
+            >
+                Copy
+            </button>
+
+        </div>
+
+
+        <div id="result"></div>
+
+
+    </section>
+
+
+</main>
+
+
+
+<script>
+
+
+const taskInfo = {
+
+    qa:
+        "Example: Which is the largest ocean?",
+
+    explain:
+        "Example: Explain photosynthesis in simple words.",
+
+    quiz:
+        "Paste a lesson, paragraph, or topic here to generate 3 MCQs.",
+
+    summarize:
+        "Paste the text you want to summarize.",
+
+    learn:
+        "Example: Learn SQL from beginner to advanced."
+
+};
+
+
+
+let lastResult = "";
+
+
+
+/* Change placeholder */
+
+document
+    .getElementById("task")
+    .addEventListener(
+        "change",
+        function () {
+
+            document
+                .getElementById("inputText")
+                .placeholder =
+                    taskInfo[this.value];
+
+        }
+    );
+
+
+
+/* Main function */
+
+async function runTask() {
+
+
+    const task =
+        document.getElementById("task").value;
+
+
+    const input =
+        document
+            .getElementById("inputText")
+            .value
+            .trim();
+
+
+    const button =
+        document.getElementById("submitBtn");
+
+
+    const status =
+        document.getElementById("status");
+
+
+    const resultCard =
+        document.getElementById("resultCard");
+
+
+    const result =
+        document.getElementById("result");
+
+
+
+    if (!input) {
+
+        status.textContent =
+            "Please enter some text first.";
+
+        return;
+    }
+
+
+
+    const endpoints = {
+
+        qa: "/qa",
+
+        explain: "/explain",
+
+        quiz: "/quiz",
+
+        summarize: "/summarize",
+
+        learn: "/learn/recommendations"
+
+    };
+
+
+
+    button.disabled = true;
+
+    button.textContent =
+        "Thinking...";
+
+
+    status.textContent =
+        "EduGenie is generating your answer...";
+
+
+    resultCard.classList.add(
+        "hidden"
+    );
+
+
+
+    try {
+
+
+        const response =
+            await fetch(
+                endpoints[task],
+                {
+
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        text: input
+                    })
+
+                }
+            );
+
+
+
+        const data =
+            await response.json();
+
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.detail ||
+                "Request failed."
+            );
+
+        }
+
+
+
+        result.innerHTML =
+            renderResult(
+                task,
+                data.result
+            );
+
+
+        lastResult =
+            extractCopyText(
+                data.result
+            );
+
+
+        resultCard.classList.remove(
+            "hidden"
+        );
+
+
+        status.textContent =
+            "Done.";
+
+
+    }
+
+
+    catch (error) {
+
+
+        result.innerHTML =
+            `
+            <div class="error">
+                ${escapeHtml(error.message)}
+            </div>
+            `;
+
+
+        lastResult =
+            error.message;
+
+
+        resultCard.classList.remove(
+            "hidden"
+        );
+
+
+        status.textContent =
+            "Something went wrong.";
+
+    }
+
+
+    finally {
+
+        button.disabled = false;
+
+        button.textContent =
+            "Generate";
+
+    }
+
+}
+
+
+
+/* Render result */
+
+function renderResult(
+    task,
+    data
+) {
+
+
+    if (task === "quiz") {
+
+
+        if (data.error) {
+
+            return `
+                <div class="error">
+                    ${escapeHtml(data.error)}
+                </div>
+            `;
+
+        }
+
+
+        return data.questions
+            .map(
+                (question, index) => `
+
+                <article
+                    class="quiz-question"
+                >
+
+                    <h3>
+                        ${index + 1}.
+                        ${escapeHtml(
+                            question.question
+                        )}
+                    </h3>
+
+
+                    <div class="options">
+
+                        ${
+                            question.options
+                            .map(
+                                (option, i) => `
+
+                                <button
+                                    class="option"
+                                    onclick="checkAnswer(
+                                        this,
+                                        '${escapeAttr(option)}',
+                                        '${escapeAttr(question.answer)}'
+                                    )"
+                                >
+
+                                    ${
+                                        String.fromCharCode(
+                                            65 + i
+                                        )
+                                    }.
+
+                                    ${escapeHtml(
+                                        option
+                                    )}
+
+                                </button>
+
+                            `
+                            )
+                            .join("")
+                        }
+
+                    </div>
+
+
+                    <p
+                        class="quiz-feedback"
+                    ></p>
+
+
+                    <p
+                        class="explanation"
+                    >
+                        ${escapeHtml(
+                            question.explanation ||
+                            ""
+                        )}
+                    </p>
+
+
+                </article>
+
+            `
+            )
+            .join("");
+
+    }
+
+
+
+    return formatText(
+        String(data)
+    );
+
+}
+
+
+
+/* Format normal text */
+
+function formatText(text) {
+
+    return escapeHtml(text)
+        .replace(
+            /\*\*(.*?)\*\*/g,
+            "<strong>$1</strong>"
+        )
+        .replace(
+            /\n/g,
+            "<br>"
+        );
+
+}
+
+
+
+/* Check quiz answer */
+
+function checkAnswer(
+    button,
+    selected,
+    correct
+) {
+
+
+    const container =
+        button.closest(
+            ".quiz-question"
+        );
+
+
+    const feedback =
+        container.querySelector(
+            ".quiz-feedback"
+        );
+
+
+    const buttons =
+        container.querySelectorAll(
+            ".option"
+        );
+
+
+    buttons.forEach(
+        btn => btn.disabled = true
+    );
+
+
+
+    if (selected === correct) {
+
+
+        button.classList.add(
+            "correct"
+        );
+
+
+        feedback.textContent =
+            "Correct! 🎉";
+
+    }
+
+
+    else {
+
+
+        button.classList.add(
+            "wrong"
+        );
+
+
+        feedback.textContent =
+            "Not quite. Correct answer: " +
+            correct;
+
+
+        buttons.forEach(
+            btn => {
+
+                if (
+                    btn.textContent
+                        .trim()
+                        .endsWith(correct)
+                ) {
+
+                    btn.classList.add(
+                        "correct"
+                    );
+
+                }
+
+            }
+        );
+
+    }
+
+}
+
+
+
+/* Copy */
+
+function copyResult() {
+
+    navigator.clipboard.writeText(
+        lastResult
+    );
+
+}
+
+
+
+/* Prepare text for copying */
+
+function extractCopyText(data) {
+
+
+    if (
+        typeof data === "string"
+    ) {
+
+        return data;
+
+    }
+
+
+
+    if (data.questions) {
+
+        return data.questions
+            .map(
+                (question, index) => {
+
+                    return `
+${index + 1}. ${question.question}
+
+${question.options.join("\n")}
+
+Answer:
+${question.answer}
+
+${question.explanation}
+                    `;
+
+                }
+            )
+            .join("\n");
+
+    }
+
+
+
+    if (data.error) {
+
+        return data.error;
+
+    }
+
+
+
+    return JSON.stringify(
+        data,
+        null,
+        2
+    );
+
+}
+
+
+
+/* Security helper */
+
+function escapeHtml(value) {
+
+    return String(value)
+        .replaceAll(
+            "&",
+            "&amp;"
+        )
+        .replaceAll(
+            "<",
+            "&lt;"
+        )
+        .replaceAll(
+            ">",
+            "&gt;"
+        )
+        .replaceAll(
+            '"',
+            "&quot;"
+        )
+        .replaceAll(
+            "'",
+            "&#039;"
+        );
+
+}
+
+
+
+/* Attribute escaping */
+
+function escapeAttr(value) {
+
+    return String(value)
+        .replaceAll(
+            "\\",
+            "\\\\"
+        )
+        .replaceAll(
+            "'",
+            "\\'"
+        );
+
+}
+
+
+</script>
+
+
+</body>
+
+</html>
